@@ -3,6 +3,8 @@ package org.epics.archiverappliance.utils.nio;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -31,15 +33,14 @@ public class ArchPaths implements Closeable {
 	public static final String ZIP_PREFIX = "jar:file://";
 	private static Logger logger = Logger.getLogger(ArchPaths.class.getName());
 	private static FileSystemProvider zipFSProvider = getZipFSProvider();
-	private ConcurrentHashMap<String, FileSystem>  fileSystemList = new ConcurrentHashMap<String, FileSystem>();
-	
+	private ConcurrentHashMap<String, FileSystem>  fileSystemList = new ConcurrentHashMap<String, FileSystem>();	
 	/**
 	 * Return a path based on a varargs list of path components.
 	 * Each path component is separated by the file separator.
-	 * @param first
-	 * @param more
-	 * @return
-	 * @throws IOException
+	 * @param first  &emsp; 
+	 * @param more  &emsp; 
+	 * @return Path  &emsp; 
+	 * @throws IOException  &emsp; 
 	 */
 	public Path get(String first, String... more) throws IOException {
 		return get(false, first, more);
@@ -48,11 +49,11 @@ public class ArchPaths implements Closeable {
 	/**
 	 * Return a path based on a varargs list of path components.
 	 * Each path component is separated by the file separator.
-	 * @param createParent - if this is true, we create the parent automatically when requesting the path
-	 * @param first
-	 * @param more
-	 * @return
-	 * @throws IOException
+	 * @param createParent If this is true, we create the parent automatically when requesting the path
+	 * @param first  &emsp; 
+	 * @param more  &emsp; 
+	 * @return Path  &emsp; 
+	 * @throws IOException &emsp; 
 	 */
 	public Path get(boolean createParent, String first, String... more) throws IOException {
 		String path;
@@ -76,9 +77,9 @@ public class ArchPaths implements Closeable {
 	}
 	
 	/**
-	 * @param uriPathOrDefautFilePath
-	 * @return
-	 * @throws IOException
+	 * @param uriPathOrDefautFilePath  &emsp; 
+	 * @return Path  &emsp; 
+	 * @throws IOException  &emsp; 
 	 */
 	public Path get(String uriPathOrDefautFilePath) throws IOException {
 		return get(uriPathOrDefautFilePath, false);
@@ -86,10 +87,10 @@ public class ArchPaths implements Closeable {
 	/**
 	 * Return a path based on the full URI representation of the path.
 	 * 
-	 * @param uriPathOrDefautFilePath
-	 * @param createParent - if this is true, we create the parent automatically when requesting the path
-	 * @return
-	 * @throws IOException
+	 * @param uriPathOrDefautFilePath  &emsp; 
+	 * @param createParent If this is true, we create the parent automatically when requesting the path
+	 * @return Path  &emsp; 
+	 * @throws IOException  &emsp; 
 	 */
 	public Path get(String uriPathOrDefautFilePath, boolean createParent) throws IOException {
 		if(uriPathOrDefautFilePath.startsWith(ZIP_PREFIX)){
@@ -151,15 +152,33 @@ public class ArchPaths implements Closeable {
 			}
 			return pathWithinZipFile;
 		} else {
-			// We are dealing with normal file system paths.
-			Path normalFilePath = FileSystems.getDefault().getPath(uriPathOrDefautFilePath);
-			Path parent = normalFilePath.getParent();
-			if (createParent && parent != null && Files.notExists(parent)) {
-				if(logger.isDebugEnabled()) logger.debug("Creating parent folder " + parent.toString());
-				Files.createDirectories(parent);
+			if(uriPathOrDefautFilePath.contains(":") && uriPathOrDefautFilePath.indexOf(":") < uriPathOrDefautFilePath.indexOf("/") && !uriPathOrDefautFilePath.startsWith("file:///")) {
+				try { 
+					URI uri = new URI(uriPathOrDefautFilePath);
+					FileSystem fs = FileSystems.newFileSystem(uri, System.getenv(), Thread.currentThread().getContextClassLoader());
+					Path normalFilePath = fs.getPath(uri.getPath());
+					Path parent = normalFilePath.getParent();
+					if (createParent && parent != null && Files.notExists(parent)) {
+						if(logger.isDebugEnabled()) logger.debug("Creating parent folder " + parent.toString());
+						Files.createDirectories(parent);
+					}
+		
+					return normalFilePath;
+				} catch(URISyntaxException ex) { 
+					throw new IOException(ex);
+				}
+				
+			} else { 
+				// We are dealing with normal file system paths.
+				Path normalFilePath = FileSystems.getDefault().getPath(uriPathOrDefautFilePath);
+				Path parent = normalFilePath.getParent();
+				if (createParent && parent != null && Files.notExists(parent)) {
+					if(logger.isDebugEnabled()) logger.debug("Creating parent folder " + parent.toString());
+					Files.createDirectories(parent);
+				}
+	
+				return normalFilePath;
 			}
-
-			return normalFilePath;
 		}
 	}
 	
@@ -168,10 +187,10 @@ public class ArchPaths implements Closeable {
 	 * Returns a seekable byte channel. 
 	 * In case of file systems, this is the raw SeekableByteChannel as returned by the provider.
 	 * In case of zip files, we wrap the InputStream using WrappedSeekableByteChannel (which is a read only byte channel for now).
-	 * @param path
-	 * @param options
-	 * @return
-	 * @throws IOException
+	 * @param path Path 
+	 * @param options  OpenOption
+	 * @return a new seekabel byte channel 
+	 * @throws IOException  &emsp; 
 	 */
 	public static SeekableByteChannel newByteChannel(Path path, OpenOption...options) throws IOException {
 		String pathURI = path.toUri().toString();
@@ -203,9 +222,9 @@ public class ArchPaths implements Closeable {
 	/**
 	 * The path used for backing up the data using ETL.
 	 * When enabling compression with packing, we backup the packed file itself as opposed to the files within the packed file.
-	 * @param path
-	 * @return
-	 * @throws IOException
+	 * @param path Path 
+	 * @return Path for backup 
+	 * @throws IOException  &emsp; 
 	 */
 	public String getPathForBackup(Path path) throws IOException {
 		String uriStr = path.toUri().toString();

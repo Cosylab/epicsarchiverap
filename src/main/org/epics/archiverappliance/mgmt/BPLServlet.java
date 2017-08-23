@@ -37,6 +37,7 @@ import org.epics.archiverappliance.mgmt.bpl.ConsolidatePBFilesForOnePV;
 import org.epics.archiverappliance.mgmt.bpl.DeletePV;
 import org.epics.archiverappliance.mgmt.bpl.ExportConfig;
 import org.epics.archiverappliance.mgmt.bpl.ExportConfigForThisInstance;
+import org.epics.archiverappliance.mgmt.bpl.GetAllExpandedPVNames;
 import org.epics.archiverappliance.mgmt.bpl.GetAllPVs;
 import org.epics.archiverappliance.mgmt.bpl.GetApplianceInfo;
 import org.epics.archiverappliance.mgmt.bpl.GetAppliancesInCluster;
@@ -107,6 +108,7 @@ public class BPLServlet extends HttpServlet {
 	static {
 		// BPL related to PVs/appliances etc
 		addAction("/getAllPVs", GetAllPVs.class);
+		addAction("/getAllExpandedPVNames", GetAllExpandedPVNames.class);
 		addAction("/getPVStatus", GetPVStatusAction.class);
 		addAction("/getPVTypeInfo", GetPVTypeInfo.class);
 		addAction("/archivePV", ArchivePVAction.class);
@@ -154,7 +156,8 @@ public class BPLServlet extends HttpServlet {
 		addAction("/getPVsByDroppedEventsTypeChange", DroppedEventsTypeChangeReport.class);
 		addAction("/getPausedPVsReport", PausedPVsReport.class);
 		addAction("/getPausedPVsForThisAppliance", GetPausedPVsForThisAppliance.class);
-		addAction("/getArchivedWaveforms", WaveformPVsAction.class);
+		addAction("/getArchivedWaveforms", WaveformPVsAction.class);		
+		
 		
 		// Others.
 		addAction("/getPolicyText", GetPolicyText.class);
@@ -239,7 +242,8 @@ public class BPLServlet extends HttpServlet {
 	/**
 	 * The main method here is used only to generate documentation for the scripting guide. 
 	 * No other functionality is provided
-	 * @throws IOException
+	 * @param args  &emsp;
+	 * @throws IOException  &emsp;
 	 */
 	public static void main(String[] args) throws IOException {
 		System.out.println("#Path mappings for mgmt BPLs");

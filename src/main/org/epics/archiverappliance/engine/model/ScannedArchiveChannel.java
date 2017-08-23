@@ -8,18 +8,12 @@
 package org.epics.archiverappliance.engine.model;
 
 import java.sql.Timestamp;
-import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.Writer;
 import org.epics.archiverappliance.config.ArchDBRTypes;
 import org.epics.archiverappliance.config.ConfigService;
 import org.epics.archiverappliance.data.DBRTimeEvent;
-import org.epics.archiverappliance.data.SampleValue;
-import org.epics.archiverappliance.data.ScalarStringSampleValue;
-import org.epics.archiverappliance.data.ScalarValue;
-import org.epics.archiverappliance.data.VectorStringSampleValue;
-import org.epics.archiverappliance.data.VectorValue;
 
 /**
  * An ArchiveChannel that stores value in a periodic scan.
@@ -33,8 +27,26 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 	private static final Logger logger = Logger.getLogger(ScannedArchiveChannel.class);
 	/** Scan period in seconds */
 	final private double scan_period;
+	private long scanPeriodMillis;
+	/**
+	 * Stores the server time when we skip recording values; if the value has not changed when the SCAN comes calling; we record the event.
+	 */
+	private long serverTimeForStragglingScanValuesMillis = -1;
 
-	/** @see ArchiveChannel#ArchiveChannel(String, Writer, Enablement,int,Timestamp,double,ConfigService,ArchDBRTypes,String,boolean)*/
+	/** @see ArchiveChannel#ArchiveChannel
+	 * @param name pv's name
+	 * @param writer the writer for this pv
+	 * @param enablement  start or stop archiving this pv when channel is created
+	 * @param buffer_capacity the sample buffer's capacity for this pv
+	 * @param last_timeestamp the last time stamp when this pv was archived
+	 * @param scan_period  &emsp;
+	 * @param configservice the configservice of new archiver
+	 * @param archdbrtype the archiving dbr type
+	 * @param controlPVname the pv's name who control this pv to start archiving or stop archiving
+	 * @param commandThreadID - this is the index into the array of JCA command threads that processes this context.
+	 * @param usePVAccess - Should we use PVAccess to connect to this PV.
+	 * @throws Exception error when creating archive channel for this pv
+	 */
 	public ScannedArchiveChannel(final String name, final Writer writer,
 			Enablement enablement, final int buffer_capacity,
 			final Timestamp last_timeestamp, final double scan_period,
@@ -47,6 +59,9 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 		this.pvMetrics.setSamplingPeriod(scan_period);
 		// this.max_repeats = max_repeats;
 		this.pvMetrics.setMonitor(false);
+		double scanJitterFactor = Double.parseDouble((String) configservice.getInstallationProperties().getOrDefault("org.epics.archiverappliance.engine.epics.scanJitterFactor", "0.95"));
+		this.scanPeriodMillis = (long) ((scan_period * scanJitterFactor) * 1000);
+		this.pvMetrics.setScanPeriodMillis(scanPeriodMillis);
 	}
 
 	/** @return Scan period in seconds */
@@ -61,145 +76,129 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 
 	// Just for debugging...
 	@Override
-	protected boolean handleNewValue(final DBRTimeEvent timeevent)
-			throws Exception {
-		final boolean written = super.handleNewValue(timeevent);
-		// if (! written)
-		// Activator.getLogger().log(Level.FINE, "{0} cached {1}", new Object[]
-		// { getName(), value });
-		return written;
-	}
+	protected boolean handleNewValue(final DBRTimeEvent timeevent) throws Exception {
+		synchronized(this) { 
+			this.serverTimeForStragglingScanValuesMillis = -1;
+			try {
+				if (super.handleNewValue(timeevent)) {
+					return true;
+				}
+			} catch (Exception e) {
+				logger.error("exception in handleNewValue for pv" + this.getName(), e);
+			}
+			
+			if (isEnabled()) {
+				try {
+					if (latestDBRTimeEvent == null) {
+						return true;
+					}
+					// Is it a new value?
+					if (isMatchingTimeStamp(lastDBRTimeEvent, latestDBRTimeEvent)) {
+						return true;
+					}
 
-	/**
-	 * Invoked by periodic scanner. Try to add the most recent value to the
-	 * archive. Skip repeated values, unless we exceed the max. repeat count.
+					if(isLessThanScanPeriod(lastDBRTimeEvent, latestDBRTimeEvent)) { 
+						// logger.debug("Latest event is less than scan periond; skipping for " + this.getName());
+						// We however keep track of the server time when we got a handle event for comparision in the SCAN thread.
+						this.serverTimeForStragglingScanValuesMillis = System.currentTimeMillis();
+						return true;
+					} else { 
+						// logger.debug("Latest event is more than scan periond; recording for " + this.getName());
+						addValueToBuffer(latestDBRTimeEvent);
+					}
+					
+				} catch (Exception e) {
+					logger.error("exception in handleNewValue for pv " + this.getName(), e);
+				}
+				return true;
+			}
+			return false;
+		}
+	}
+	
+	/* (non-Javadoc)
+	 * @see java.lang.Runnable#run()
+	 * Called from the SCAN thread...
 	 */
 	@Override
-	final public void run() {
-
-		if (!isEnabled())
-			return;
-		try {
-			synchronized (this) { // Have anything?
-				if (latestDBRTimeEvent == null) {
-
-					return;
-				}
-				// Is it a new value?
-
-				if (isMatchingValue(lastDBRTimeEvent, latestDBRTimeEvent)) {
-
-					if (isMatchingTimeStamp(lastDBRTimeEvent,
-							latestDBRTimeEvent)) {
-						// System.out.println("same value");
+	public void run() {
+		synchronized(this) { 
+			if (isEnabled()) {
+				try {
+					if (latestDBRTimeEvent == null || this.serverTimeForStragglingScanValuesMillis <= 0) {
+						// logger.debug("Latest event/straggling time is null " + this.getName());
+						return;
+					}
+					// Is it a new value?
+					if (isMatchingTimeStamp(lastDBRTimeEvent, latestDBRTimeEvent)) {
+						// logger.debug("Latest event is same as previous ebent " + this.getName());
 						return;
 					}
 
+					if(isLessThanScanPeriod(this.serverTimeForStragglingScanValuesMillis, System.currentTimeMillis())) { 
+						// logger.debug("Latest event is less than scan period; skipping for " + this.getName());
+						return;
+					} else { 
+						// logger.debug("Latest event is more than scan period; recording for " + this.getName());
+						addValueToBuffer(latestDBRTimeEvent);
+					}
+
+				} catch (Exception e) {
+					logger.error("exception in handleNewValue for pv " + this.getName(), e);
 				}
-
-				// New value, or exceeded repeats
-				// repeats = 0;
+				return;
 			}
-			// unlocked, should have 'value'
-
-			addValueToBuffer(latestDBRTimeEvent);
-		} catch (Exception e) {
-			logger.error("exception duing run", e);
+			return;
 		}
 	}
+
 
 	/**
-	 * Check if values match in status, severity, and value. Time is ignored.
-	 * 
-	 * @param val1
-	 *            One value
-	 * @param val2
-	 *            Other value
-	 * @return <code>true</code> if they match 
+	 * check whether the two timeevent have the same time stamp
+	 * @param tempEvent1 time event 1
+	 * @param tempEvent2  time event 2
+	 * @return true if they have the same time stamps. Other wise ,false
 	 */
-	private boolean isMatchingValue(final DBRTimeEvent tempEvent1,
-			final DBRTimeEvent tempEvent2) {
-		// Compare data type and value
-		if (tempEvent1 == null)
+	private boolean isMatchingTimeStamp(final DBRTimeEvent tempEvent1, final DBRTimeEvent tempEvent2) {
+		if(tempEvent1 != null && tempEvent2 != null && tempEvent1.getEventTimeStamp() != null && tempEvent2.getEventTimeStamp() != null) { 
+			Timestamp time1 = tempEvent1.getEventTimeStamp();
+			Timestamp time2 = tempEvent2.getEventTimeStamp();
+			return time1.equals(time2);
+		} else { 
 			return false;
-		SampleValue val1 = tempEvent1.getSampleValue();
-		SampleValue val2 = tempEvent2.getSampleValue();
-		if (val1 instanceof VectorValue) {
-			if (!(val2 instanceof VectorValue))
-				return false;
-
-			VectorValue<?> vv1 = (VectorValue<?>) val1;
-			VectorValue<?> vv2 = (VectorValue<?>) val2;
-			final Object values1[] = vv1.getValues().toArray();
-			final Object values2[] = vv2.getValues().toArray();
-			if (!Arrays.equals(values1, values2))
-				return false;
-
 		}
-
-		else if (val1 instanceof ScalarValue) {
-			if (!(val2 instanceof ScalarValue))
-				return false;
-
-			ScalarValue<?> vv1 = (ScalarValue<?>) val1;
-			ScalarValue<?> vv2 = (ScalarValue<?>) val2;
-			Double dou1 = vv1.getValue().doubleValue();
-			Double dou2 = vv2.getValue().doubleValue();
-			if ((dou1 - dou2) != 0)
-				return false;
-
-		}
-		// ScalarStringSampleValue VectorStringSampleValue
-		else if (val1 instanceof ScalarStringSampleValue) {
-			if (!(val2 instanceof ScalarStringSampleValue))
-				return false;
-
-			ScalarStringSampleValue vv1 = (ScalarStringSampleValue) val1;
-			ScalarStringSampleValue vv2 = (ScalarStringSampleValue) val2;
-			String str1 = vv1.toString();
-			String str2 = vv2.toString();
-			if (str1 != null) {
-				if (!str1.equals(str2))
-					return false;
-			}
-
-		} else if (val1 instanceof VectorStringSampleValue) {
-			if (!(val2 instanceof VectorStringSampleValue))
-				return false;
-
-			VectorStringSampleValue vv1 = (VectorStringSampleValue) val1;
-			VectorStringSampleValue vv2 = (VectorStringSampleValue) val2;
-
-			String str1 = vv1.toString();
-			String str2 = vv2.toString();
-			if (!str1.equals(str2))
-				return false;
-
-		} else
-			return false;
-
-		return true;
-
 	}
-/**
- * check whether the two timeevent have the same time stamp
- * @param tempEvent1 time event 1
- * @param tempEvent2  time event 2
- * @return true if they have the same time stamps. Other wise ,false
- */
-	private boolean isMatchingTimeStamp(final DBRTimeEvent tempEvent1,
-			final DBRTimeEvent tempEvent2) {
-		// Compare data type and value
-
-		java.sql.Timestamp time1 = tempEvent1.getEventTimeStamp();
-		java.sql.Timestamp time2 = tempEvent2.getEventTimeStamp();
-		long miltime1 = time1.getTime();
-		long miltime2 = time2.getTime();
-		if (miltime1 != miltime2) {
+	
+	/**
+	 * Return true if the second event is within scanPeriodInMillis of the first event.
+	 * @param tempEvent1
+	 * @param tempEvent2
+	 * @return
+	 */
+	private boolean isLessThanScanPeriod(final DBRTimeEvent tempEvent1, final DBRTimeEvent tempEvent2) { 
+		if(tempEvent1 != null && tempEvent2 != null && tempEvent1.getEventTimeStamp() != null && tempEvent2.getEventTimeStamp() != null) { 
+			Timestamp time1 = tempEvent1.getEventTimeStamp();
+			Timestamp time2 = tempEvent2.getEventTimeStamp();
+			// logger.debug("Diff = " + (time2.getTime() - time1.getTime()) + " and scanPeriodMillis " + scanPeriodMillis);
+			return (time2.getTime() - time1.getTime()) < this.scanPeriodMillis;
+		} else { 
 			return false;
-		} else
-			return true;
-
+		}
+	}
+	
+	/**
+	 * Return true if the second event is within scanPeriodInMillis of the first event.
+	 * @param tempEvent1
+	 * @param tempEvent2
+	 * @return
+	 */
+	private boolean isLessThanScanPeriod(long ts1, long ts2) {
+		if(ts1 != -1 && ts2 != -1) { 
+			// logger.debug("Diff = " + (ts1 - ts2) + " and scanPeriodMillis " + scanPeriodMillis);
+			return (ts2 - ts1) < this.scanPeriodMillis;
+		} else { 
+			return false;
+		}
 	}
 
 }

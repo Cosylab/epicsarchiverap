@@ -69,51 +69,60 @@ public class PVTypeInfo implements Serializable {
 
 	// Info from the dbr_ctrl structures
 	/**
-	 * <PV Name>.LOLO; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.LOLO; though we get it using the dbr_ctrl structures
 	 */
 	private double lowerAlarmLimit;
 	/**
-	 * <PV Name>.DRVL; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.DRVL; though we get it using the dbr_ctrl structures
 	 */
 	private double lowerCtrlLimit;
 	/**
-	 * <PV Name>.LOPR; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.LOPR; though we get it using the dbr_ctrl structures
 	 */
 	private double lowerDisplayLimit;
 	/**
-	 * <PV Name>.LOW; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.LOW; though we get it using the dbr_ctrl structures
 	 */
 	private double lowerWarningLimit;
 	/**
-	 * <PV Name>.HIHI; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.HIHI; though we get it using the dbr_ctrl structures
 	 */
 	private double upperAlarmLimit;
 	/**
-	 * <PV Name>.DRVH though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.DRVH though we get it using the dbr_ctrl structures
 	 */
 	private double upperCtrlLimit;
 	/**
-	 * <PV Name>.HOPR; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.HOPR; though we get it using the dbr_ctrl structures
 	 */
 	private double upperDisplayLimit;
 	/**
-	 * <PV Name>.HIGH; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.HIGH; though we get it using the dbr_ctrl structures
 	 */
 	private double upperWarningLimit;
 	/**
-	 * <PV Name>.PREC; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.PREC; though we get it using the dbr_ctrl structures
 	 */
 	private double precision;
 	/**
-	 * <PV Name>.EGU; though we get it using the dbr_ctrl structures
+	 * &lt;PV Name&gt;.EGU; though we get it using the dbr_ctrl structures
 	 */
 	private String units;
 	
 	
 	// Info pertaining to the archiver...
 	private boolean hasReducedDataSet;
+	/**
+	 * the average event rate in one minute (event count / sec)
+	 */	
 	private float computedEventRate;
+ 	/**
+	 * the average storage rate in in one minute ( bytes / sec)
+	 */
 	private float computedStorageRate;
+	/**
+	 * the storage size / the total event count if the event count &ne; 0
+	 */
 	private int computedBytesPerEvent;
 	private float userSpecifiedEventRate;
 	private Timestamp creationTime;
@@ -301,8 +310,7 @@ public class PVTypeInfo implements Serializable {
 	
 	/**
 	 * Parse a string (JSON) representation of the PVTypeInfo object into this object
-	 * @param typeInfoStr
-	 * @throws Exception
+	 * @param typeInfoStr  &emsp;
 	 */
 	public void parsePolicyRepresentation(String typeInfoStr) {
 		JSONObject parsedObj = (JSONObject) JSONValue.parse(typeInfoStr);
@@ -530,7 +538,9 @@ public class PVTypeInfo implements Serializable {
 	
 	/**
 	 * Loop thru the stores outlined in this typeinfo and determine the most recent event for this pv
-	 * @return
+	 * @param configService ConfigService
+	 * @throws IOException  &emsp;
+	 * @return Timestamp  &emsp;
 	 */
 	public Timestamp determineLastKnownEventFromStores(ConfigService configService) throws IOException {
 		try(BasicContext context = new BasicContext()) {
@@ -552,8 +562,8 @@ public class PVTypeInfo implements Serializable {
 	/**
 	 * The secondsToBuffer is a system wide property. 
 	 * Use this method to get the proper defaults.
-	 * @param configService
-	 * @return
+	 * @param configService ConfigService
+	 * @return secondsToBuffer  &emsp;
 	 */
 	public static int getSecondsToBuffer(ConfigService configService) {
 		String secondsToBufferStr = configService.getInstallationProperties().getProperty("org.epics.archiverappliance.config.PVTypeInfo.secondsToBuffer", "10");
@@ -565,7 +575,7 @@ public class PVTypeInfo implements Serializable {
 	/**
 	 * The archiver appliance stores data in chunks that have a well defined key. 
 	 * We record this key in the typeinfo (to accommodate slowly changing key mapping strategies)
-	 * @return
+	 * @return chunkKey  &emsp; 
 	 */
 	public String getChunkKey() {
 		return chunkKey;
@@ -580,14 +590,14 @@ public class PVTypeInfo implements Serializable {
 	}
 
 	/**
-	 * @return the hostName
+	 * @return hostName  &emsp;
 	 */
 	public String getHostName() {
 		return hostName;
 	}
 
 	/**
-	 * @param hostName the hostName to set
+	 * @param hostName  &emsp;
 	 */
 	public void setHostName(String hostName) {
 		this.hostName = hostName;

@@ -30,22 +30,15 @@ public class SampleBuffer {
 	 * the full channel, to decouple stuff).
 	 */
 	final private String channel_name;
-     /**
-      * current ArrayListEventStream
-      */
+       /**
+	* current ArrayListEventStream
+	*/
 	private ArrayListEventStream currentSamples;
 	/**
 	 * previous ArrayListEventStream
 	 */
 	private ArrayListEventStream previousSamples;
-	/** Statistics */
-	final private BufferStats stats = new BufferStats();
 
-	/**
-	 * Number of overruns when new string of overruns started, or
-	 * <code>null</code>
-	 */
-	private Integer start_of_overruns;
 	/**
 	 * year listener for this buffer.
 	 */
@@ -55,18 +48,14 @@ public class SampleBuffer {
 	 */
 	private PVMetrics pVMetrics;
 
-	/** Logger for overrun messages */
-	final private static ThrottledLogger overrun_msg = new ThrottledLogger(
-			LogLevel.warning, 60); //$NON-NLS-1$
-
 	/**
 	 * Is the buffer in an error state because of RDB write errors? Note that
 	 * this is global for all buffers, not per instance!
 	 */
 	private static volatile boolean error = false;
-    /**
-     * the buffer size
-     */
+        /**
+	 * the buffer size
+	 */
 	final private int capacity;
 	/**
 	 * the arch dbr type of the pv who has this sample buffer
@@ -75,7 +64,13 @@ public class SampleBuffer {
 	private short year;
 	private static Logger logger = Logger.getLogger(SampleBuffer.class.getName());
 
-	/** Create sample buffer of given capacity */
+	/** Create sample buffer of given capacity 
+	 *
+	 * @param channel_name  &emsp;
+	 * @param capacity  &emsp;
+	 * @param archdbrtype ArchDBRTypes
+	 * @param pVMetrics PVMetrics 
+	 */
 	public SampleBuffer(final String channel_name, final int capacity,
 			ArchDBRTypes archdbrtype, PVMetrics pVMetrics) {
 		this.channel_name = channel_name;
@@ -165,7 +160,9 @@ public class SampleBuffer {
 		return error;
 	}
 
-	/** Set the error state. */
+	/** Set the error state. 
+	 * @param error  &emsp;
+	 */
 	public static void setErrorState(final boolean error) {
 		SampleBuffer.error = error;
 	}
@@ -173,8 +170,8 @@ public class SampleBuffer {
 	/**
 	 * Add a sample to the queue, maybe dropping older samples
 	 * 
-	 * @return - true if we need to increment the event count.
-	 * @throws Exception
+	 * @param value DBRTimeEvent
+	 * @return boolean true if we need to increment the event count.
 	 */
 	@SuppressWarnings("nls")
 	public boolean add(final DBRTimeEvent value)  {
@@ -196,34 +193,19 @@ public class SampleBuffer {
 			yearListener.yearChanged(this);
 		}
 		try {
-			{  
-				synchronized (this) {
-			int remainSize = capacity - currentSamples.size();
+			synchronized (this) {
+				int remainSize = capacity - currentSamples.size();
 
-			if (remainSize < 1) {
-				retval = false;
-				// the queue is full
-				// Note start of overruns, then drop older sample
-				
-				currentSamples.remove(0);
-				//}
-				pVMetrics.addSampleBufferFullLostEventCount();
-				// }
-				if (start_of_overruns == null)
-					start_of_overruns = Integer.valueOf(stats.getOverruns());
-				stats.addOverrun();
-			} else if (start_of_overruns != null) { // Ending a string of
-													// overruns. Maybe log it.
-				final int overruns = stats.getOverruns() - start_of_overruns;
-				overrun_msg.log(channel_name + ": " + overruns + " overruns");
-				start_of_overruns = null;
-			}
-			
-			
+				if (remainSize < 1) {
+					retval = false;
+					// The buffer is full, drop the first sample and increment the bufferFull lost event count. 
+					currentSamples.remove(0);
+					pVMetrics.addSampleBufferFullLostEventCount();
+				}
+
 				currentSamples.add(value);
 			}
-				return retval;
-			}
+			return retval;
 		} catch (Exception e) {
 			//throw e;
 			 logger.error(
@@ -234,36 +216,16 @@ public class SampleBuffer {
 	}
 
 
-	/** Update stats with current values */
-	public void updateStats() {
-		stats.updateSizes(getQueueSize());
-	}
-
-	/** @return Buffer statistics. */
-	public BufferStats getBufferStats() {
-		return stats;
-	}
-
-	/** Reset statistics */
-	public void reset() {
-
-		stats.reset();
-	}
-
 	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
-		return String
-				.format("Sample buffer '%s': %d samples, %d samples max, %.1f samples average, %d overruns",
-						channel_name, getQueueSize(), stats.getMaxSize(),
-						stats.getAverageSize(), stats.getOverruns());
+		return String.format("Sample buffer '%s': %d samples, %d samples max", channel_name, getQueueSize(), this.capacity);
 	}
-/**
- * add the year listener to this buffer
- * @param yearListener the interface of yearListener
- */
+	/**
+	 * add the year listener to this buffer
+	 * @param yearListener the interface of yearListener
+	 */
 	public void addYearListener(YearListener yearListener) {
 		this.yearListener = yearListener;
 	}
-
 }

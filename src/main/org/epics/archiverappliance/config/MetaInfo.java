@@ -128,7 +128,7 @@ public class MetaInfo {
 	private int count;
 
 	/**
-	 *  the pv is vector or not. when cout=nt >1 ,isVector=true. otherelse isVector=false;
+	 *  the pv is vector or not. when count > 1 ,isVector=true. otherelse isVector=false;
 	 */
 	private boolean isVector=false;
 
@@ -148,7 +148,7 @@ public class MetaInfo {
 	private long startTime=0L;
 
 	/**
-	 * store other information include MDEL,ADEL   &
+	 * store other information include MDEL,ADEL
 	 */
 	private HashMap<String,String> otherMetaInfo=new  HashMap<String,String>();
 
@@ -218,7 +218,9 @@ public class MetaInfo {
 
 	/**
 	 * save the basical info from dbr
-	 * @param dbr 
+	 * @param pvName the name of the PV
+	 * @param dbr EPICS DB record
+	 * @param configService ConfigService
 	 */
 
 	public void applyBasicInfo(String pvName, final DBR dbr, ConfigService configService) {
@@ -277,15 +279,15 @@ public class MetaInfo {
 
 	/**
 	 * set aliaseName
-	 * @param aliaseName
+	 * @param aliaseName   &emsp;
 	 */
 	public void setAliasName(String aliaseName) {
 		this.aliasName=aliaseName;
 	}
 
 	/**
-	 * get lowerAlarmLimit
-	 * @return lowerAlarmLimit
+	 * get lowerAlarmLimit 
+	 * @return lowerAlarmLimit  &lt;PV Name&gt;.LOLO
 	 */
 	public double getLowerAlarmLimit() {
 		return lowerAlarmLimit;
@@ -293,7 +295,7 @@ public class MetaInfo {
 
 	/**
 	 * get loweCtrlLimit
-	 * @return loweCtrlLimit
+	 * @return loweCtrlLimit  &lt;PV Name&gt;.DRVL
 	 */
 	public double getLoweCtrlLimit() {
 		return loweCtrlLimit;
@@ -301,7 +303,7 @@ public class MetaInfo {
 
 	/**
 	 * get lowerDisplayLimit
-	 * @return lowerDisplayLimit
+	 * @return lowerDisplayLimit  &lt;PV Name&gt;.LOPR 
 	 */
 	public double getLowerDisplayLimit() {
 		return lowerDisplayLimit;
@@ -311,7 +313,7 @@ public class MetaInfo {
 
 	/**
 	 * get lowerWarningLimit
-	 * @return lowerWarningLimit
+	 * @return lowerWarningLimit &lt;PV Name&gt;.LOW
 	 */
 	public double getLowerWarningLimit() {
 		return lowerWarningLimit;
@@ -319,7 +321,7 @@ public class MetaInfo {
 
 	/**
 	 * get upperAlarmLimit
-	 * @return upperAlarmLimit
+	 * @return upperAlarmLimit &lt;PV Name&gt;.HIHI
 	 */
 	public double getUpperAlarmLimit() {
 		return upperAlarmLimit;
@@ -327,7 +329,7 @@ public class MetaInfo {
 
 	/**
 	 * get upperCtrlLimit
-	 * @return upperCtrlLimit
+	 * @return upperCtrlLimit  &lt;PV Name&gt;.DRVH
 	 */
 	public double getUpperCtrlLimit() {
 		return upperCtrlLimit;
@@ -335,7 +337,7 @@ public class MetaInfo {
 
 	/**
 	 * get upperDisplayLimit
-	 * @return upperDisplayLimit
+	 * @return upperDisplayLimit  &lt;PV Name&gt;.HOPR
 	 */
 
 	public double getUpperDisplayLimit() {
@@ -344,7 +346,7 @@ public class MetaInfo {
 
 	/**
 	 * get upperWarningLimit
-	 * @return upperWarningLimit
+	 * @return upperWarningLimit  &lt;PV Name&gt;.HIGH
 	 */
 	public double getUpperWarningLimit() {
 		return upperWarningLimit;
@@ -352,7 +354,7 @@ public class MetaInfo {
 
 	/**
 	 * get precision
-	 * @return precision
+	 * @return precision &lt;PV Name&gt;.PREC
 	 */
 	public int getPrecision() {
 		return precision;
@@ -360,7 +362,7 @@ public class MetaInfo {
 
 	/**
 	 * get unit
-	 * @return unit
+	 * @return unit &lt;PV Name&gt;.EGU
 	 */
 	public String getUnit() {
 		return unit;
@@ -368,7 +370,7 @@ public class MetaInfo {
 
 	/**
 	 * get aliasName
-	 * @return aliasName
+	 * @return aliasName  &lt;PV Name&gt;.NAME
 	 */
 	public String getAliasName() {
 		return aliasName;
@@ -376,7 +378,7 @@ public class MetaInfo {
 
 	/**
 	 * get ArchDBRTypes
-	 * @return ArchDBRTypes
+	 * @return ArchDBRTypes  &emsp;
 	 */
 	public ArchDBRTypes getArchDBRTypes() {
 		return archDBRTypes;
@@ -384,7 +386,7 @@ public class MetaInfo {
 
 	/**
 	 * get the average event rate in 1 minute
-	 * @return  average event rate
+	 * @return eventRate  the average event rate in 1 min 
 	 */
 	public double getEventRate() {
 		eventRate=((double)eventCount)/60;
@@ -392,8 +394,8 @@ public class MetaInfo {
 	}
 
 	/**
-	 *  get the average storage rate in 1 minute
-	 * @return average storage rate
+	 *  get the average storage rate in one minute
+	 * @return storageRate average storage rate (bytes per second)
 	 */
 	public double getStorageRate() {
 		storageRate=((double)storageSize)/60;
@@ -402,7 +404,7 @@ public class MetaInfo {
 
 	/**
 	 * get the element count of the pv's value. 
-	 * @return count
+	 * @return count  &emsp;
 	 */
 	public int getCount() {
 		return count;
@@ -410,7 +412,7 @@ public class MetaInfo {
 
 	/**
 	 *the pv is vector or not
-	 * @return true if vector ,else false;
+	 * @return isVector true if vector, else false;
 	 */
 	public boolean isVector() {
 		return isVector;
@@ -422,7 +424,7 @@ public class MetaInfo {
 
 	/**
 	 * get total count of event in 1 minute.
-	 * @return the count of event
+	 * @return eventCount the count of event in one minute
 	 */
 	public long getEventCount() {
 		return eventCount;
@@ -430,7 +432,7 @@ public class MetaInfo {
 
 	/**
 	 * get the toal storage size of the event in 1 minute
-	 * @return   toal storage size
+	 * @return  storageSize toal storage size in one minute
 	 */
 	public long getStorageSize() {
 		return storageSize;
@@ -442,7 +444,7 @@ public class MetaInfo {
 
 	/**
 	 * compute the storage rate and the event rate
-	 * @param dbrtimeevent 
+	 * @param dbrtimeevent  DBRTimeEvent
 	 */
 
 	public void computeRate(DBRTimeEvent dbrtimeevent) {
@@ -500,7 +502,7 @@ public class MetaInfo {
 
 	/**
 	 * get the time when archiving this pv.
-	 * @return the starting time and  the number of milliseconds since 1970/01/01
+	 * @return startTime the starting time and  the number of milliseconds since 1970/01/01
 	 */
 	public long getStartTime() {
 		return startTime;
@@ -508,7 +510,7 @@ public class MetaInfo {
 
 	/**
 	 * set the archiving DBRType for this pv
-	 * @param archDBRTypes
+	 * @param archDBRTypes ArchDBRTypes
 	 */
 
 	public void setArchDBRTypes(ArchDBRTypes archDBRTypes) {
@@ -550,8 +552,7 @@ public class MetaInfo {
 
 	/**
 	 * set the lower warning limit
-	 * @param lowerWarningLimit 
-	 *     the lower warning limit
+	 * @param lowerWarningLimit    the lower warning limit
 	 */
 	public void setLowerWarningLimit(double lowerWarningLimit) {
 		this.lowerWarningLimit = lowerWarningLimit;
@@ -591,7 +592,7 @@ public class MetaInfo {
 
 	/**
 	 * set the precision
-	 * @param precision   precision
+	 * @param precision  the precision
 	 */
 	public void setPrecision(int precision) {
 		this.precision = precision;
@@ -607,7 +608,7 @@ public class MetaInfo {
 
 	/**
 	 * set the total event count
-	 * @param eventCount
+	 * @param eventCount  &emsp;
 	 */
 	public void setEventCount(long eventCount) {
 		this.eventCount = eventCount;
@@ -615,7 +616,7 @@ public class MetaInfo {
 
 	/**
 	 * set total storage size of the event until now
-	 * @param storageSize
+	 * @param storageSize  &emsp;
 	 */
 	public void setStorageSize(long storageSize) {
 		this.storageSize = storageSize;
@@ -639,7 +640,7 @@ public class MetaInfo {
 
 	/**
 	 * set the count of pv's value.
-	 * @param count
+	 * @param count  &emsp;
 	 */
 	public void setCount(int count) {
 		this.count = count;
@@ -647,7 +648,7 @@ public class MetaInfo {
 
 	/**
 	 * set this pv to be a vector or not
-	 * @param isVector
+	 * @param isVector  &emsp;
 	 */
 	public void setVector(boolean isVector) {
 		this.isVector = isVector;
@@ -665,8 +666,8 @@ public class MetaInfo {
 	 * If we detect a change in the units or precision, we update the typeInfo in the configservice. 
 	 * This should accommodate changes in EGU and precision.
 	 * However, this should happen rarely or else performance will suffer.
-	 * @param pvName
-	 * @param configService
+	 * @param pvName The name of PV. 
+	 * @param configService ConfigService
 	 */
 	private void updateTypeInfo(String pvName, ConfigService configService) {
 		PVTypeInfo typeInfo = configService.getTypeInfoForPV(pvName);
@@ -697,7 +698,7 @@ public class MetaInfo {
 	
 	/**
 	 * Add the latest metadata values to the dict
-	 * @param retVal
+	 * @param retVal HashMap 
 	 */
 	public void addToDict(HashMap<String, String> retVal) {
 		retVal.put("LOPR", Double.toString(lowerDisplayLimit));

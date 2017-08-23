@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletContext;
@@ -189,6 +190,8 @@ public class DefaultConfigService implements ConfigService {
 
 
 	private ServletContext servletContext;
+	
+	private long appserverStartEpochSeconds = TimeUtils.getCurrentEpochSeconds();
 
 	protected DefaultConfigService() {
 		// Only the unit tests config service uses this constructor.
@@ -695,7 +698,7 @@ public class DefaultConfigService implements ConfigService {
 						configlogger.fatal("Exception starting up the engine channels on startup", t);
 					}
 				}
-			}, 15, TimeUnit.SECONDS); 
+			}, 1, TimeUnit.SECONDS); 
 		} else if(this.warFile == WAR_FILE.ETL) {
 			this.etlPVLookup.postStartup();
 		} else if(this.warFile == WAR_FILE.MGMT) {
@@ -1089,11 +1092,16 @@ public class DefaultConfigService implements ConfigService {
 			return ret;
 		} else { 
 			// The use pattern did not have any fixed elements at all. 
-			// In this case we do brute force matching; should take longer. 
-			logger.debug("Using brute force pattern matching against names");
-			HashSet<String> ret = new HashSet<String>();
+			// In this case we do brute force matching; should take longer.
+			// This is also not optimal but probably don't want yet another list of PV's
 			Pattern pattern = Pattern.compile(nameToMatch);
-			for(String pvName : this.pvsForThisAppliance) { 
+			HashSet<String> allNames = new HashSet<String>();
+			HashSet<String> ret = new HashSet<String>();
+			logger.debug("Using brute force pattern matching against names");
+			for(ConcurrentSkipListSet<String> pvNamesForPart : parts2PVNamesForThisAppliance.values()) { 
+				allNames.addAll(pvNamesForPart);
+			}
+			for(String pvName : allNames) { 
 				if(pattern.matcher(pvName).matches()) { 
 					ret.add(pvName);
 				}
@@ -1879,15 +1887,19 @@ public class DefaultConfigService implements ConfigService {
 					this.getExternalArchiverDataServers().put(serverUrl, archivesCSV);
 					String[] archives = archivesCSV.split(",");
 
-					try {
-						for(int i = 0; i < archives.length; i++) {
-							String archive = archives[i];
-							loadExternalArchiverPVs(serverUrl, archive);
+					this.startupExecutor.schedule(new Runnable() {
+						@Override
+						public void run() {
+							try {
+								for(int i = 0; i < archives.length; i++) {
+									String archive = archives[i];
+									loadExternalArchiverPVs(serverUrl, archive);
+								}
+							} catch(Exception ex) {
+								logger.error("Exception adding Channel Archiver archives " + serverUrl + " - " + archivesCSV, ex);
+							}
 						}
-					} catch(Exception ex) {
-						logger.error("Exception adding Channel Archiver archives " + serverUrl + " - " + archivesCSV, ex);
-						throw new IOException(ex);
-					}
+					}, 15, TimeUnit.SECONDS); 
 				}
 			}
 			configlogger.info("Done loading external servers from persistence ");
@@ -1985,4 +1997,47 @@ public class DefaultConfigService implements ConfigService {
 	public Set<String> getNamedFlagNames() {
 		return namedFlags.keySet();
 	}
+
+	@Override
+	public long getTimeOfAppserverStartup() {
+		return this.appserverStartEpochSeconds;
+	}
+
+	@Override
+	public void getAllExpandedNames(Consumer<String> func) {
+		Collection<String> allPVs = this.getAllPVs();
+		// Add fields and the VAL field
+		for(String pvName : allPVs) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+				PVTypeInfo typeInfo = this.getTypeInfoForPV(pvName);
+				if(typeInfo != null) { 
+					for(String fieldName : typeInfo.getArchiveFields()) { 
+						func.accept(pvName + "." + fieldName);
+					}
+				}
+			}
+		}
+		List<String> allAliases = this.getAllAliases();
+		for(String pvName : allAliases) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+				PVTypeInfo typeInfo = this.getTypeInfoForPV(pvName);
+				if(typeInfo != null) { 
+					for(String fieldName : typeInfo.getArchiveFields()) { 
+						func.accept(pvName + "." + fieldName);
+					}
+				}
+			}
+		}
+		for(String pvName : this.getArchiveRequestsCurrentlyInWorkflow()) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+			}
+		}
+	}
+	
 }

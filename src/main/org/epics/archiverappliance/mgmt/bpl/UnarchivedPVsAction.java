@@ -9,8 +9,10 @@ package org.epics.archiverappliance.mgmt.bpl;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -18,8 +20,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.common.BPLAction;
 import org.epics.archiverappliance.config.ConfigService;
-import org.epics.archiverappliance.config.PVNames;
-import org.epics.archiverappliance.config.PVTypeInfo;
 import org.epics.archiverappliance.utils.ui.MimeTypeConstants;
 import org.json.simple.JSONValue;
 
@@ -28,8 +28,8 @@ import org.json.simple.JSONValue;
  * Of course, you can use the status call but that makes calls to the engine etc and can be stressful if you are checking several thousand PVs
  * All this does is check the configservice...
  * 
- * @epics.BPLAction - Given a list of PVs, determine those that are not being archived/have pending requests.
- * @epics.BPLActionParam pv - A list of pv names. Send as a CSV using a POST.
+ * @epics.BPLAction - Given a list of PVs, determine those that are not being archived/have pending requests/have aliases.
+ * @epics.BPLActionParam pv - A list of pv names. Send as a CSV using a POST or JSON array.
  * @epics.BPLActionEnd
  * 
  * @author mshankar
@@ -41,38 +41,20 @@ public class UnarchivedPVsAction implements BPLAction {
 	@Override
 	public void execute(HttpServletRequest req, HttpServletResponse resp, ConfigService configService) throws IOException {
 		logger.info("Determining PVs that are unarchived ");
-		LinkedList<String> pvNames = PVsMatchingParameter.getPVNamesFromPostBody(req, configService);
-		LinkedList<String> unarchivedPVs = new LinkedList<String>();
-		for(String pvName : pvNames) {
-			PVTypeInfo typeInfo = null;
-			logger.debug("Check for the name as it came in from the user " + pvName);
-			typeInfo = configService.getTypeInfoForPV(pvName);
-			if(typeInfo != null) continue;
-			logger.debug("Check for the normalized name");
-			typeInfo = configService.getTypeInfoForPV(PVNames.normalizePVName(pvName));
-			if(typeInfo != null) continue;
-			logger.debug("Check for aliases");
-			String aliasRealName = configService.getRealNameForAlias(PVNames.normalizePVName(pvName));
-			if(aliasRealName != null) { 
-				typeInfo = configService.getTypeInfoForPV(aliasRealName);
-				if(typeInfo != null) continue;
-			}
-			logger.debug("Check for fields");
-			String fieldName = PVNames.getFieldName(pvName);
-			if(fieldName != null) { 
-				typeInfo = configService.getTypeInfoForPV(PVNames.stripFieldNameFromPVName(pvName));
-				if(typeInfo != null) { 
-					if(Arrays.asList(typeInfo.getArchiveFields()).contains(fieldName)) continue;
-				}
-			}
-			// Think we've tried every possible use cases..
-			unarchivedPVs.add(pvName);
-		}
+		Set<String> pvNamesFromUser = new HashSet<String>(PVsMatchingParameter.getPVNamesFromPostBody(req, configService));
+
+		Set<String> expandedNames = new HashSet<String>(); 
+		configService.getAllExpandedNames(new Consumer<String>(){
+			@Override
+			public void accept(String t) {
+				expandedNames.add(t);
+			} });
 		
+		pvNamesFromUser.removeAll(expandedNames);
 		
 		resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
 		try (PrintWriter out = resp.getWriter()) {
-			JSONValue.writeJSONString(unarchivedPVs, out);
+			JSONValue.writeJSONString(new LinkedList<String>(pvNamesFromUser), out);
 		}
 	}
 }
